@@ -5,4 +5,10 @@
 -R oidc oidc
 
 oidc/impl.v
+oidc/game.v
 oidc/proofs/base.v
+oidc/proofs/tls.v
+oidc/proofs/op.v
+oidc/proofs/rp.v
+oidc/proofs/browser.v
+oidc/proofs/security.v
