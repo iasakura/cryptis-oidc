@@ -5,4 +5,5 @@
 -R oidc oidc
 
 oidc/impl.v
+oidc/game.v
 oidc/proofs/base.v

@@ -33,7 +33,7 @@ the interesting attack surface of this protocol lives.
   B -->  RP: /cb ⟨code, state, iss⟩, Cookie: sid
   RP -->  OP: /token ⟨client_id, secret, code, verifier⟩   (direct, not via B)
   OP -->  RP: ⟨id_token⟩
-  RP -->  B : page ⟨sub⟩
+  RP -->  B : page ⟨iss, sub⟩
 
   id_token = sign skOP ⟨iss, sub, aud, nonce⟩
 
@@ -181,7 +181,7 @@ End Browser.
       host      : the RP's own origin (used to build redirect_uri)
       providers : iss ↦ ⟨host, tls_pk, client_secret⟩ for each trusted OP
       sessions  : browser cookie ↦ ⟨iss, state, nonce, verifier⟩ (in flight)
-      logins    : browser cookie ↦ sub                            (completed) *)
+      logins    : browser cookie ↦ ⟨iss, sub⟩                     (completed) *)
 
 Module RP.
 
@@ -247,8 +247,11 @@ Definition handle_cb : val := λ: "c" "s" "params" "cookie",
   guard: eq_term "iss2" "iss"
       && eq_term "aud" (client_id "s")
       && eq_term "nonce2" "nonce0" in
-  AList.insert (logins "s") "cookie" "sub";;
-  SOME (HTTP.page HTTP.no_cookie "sub").
+  (* The identity is the pair ⟨iss, sub⟩: [sub] alone means nothing once the RP
+     trusts more than one provider. *)
+  let: "id" := term_of_list ["iss"; "sub"] in
+  AList.insert (logins "s") "cookie" "id";;
+  SOME (HTTP.page HTTP.no_cookie "id").
 
 Definition handler : val := λ: "c" "s" "req",
   bind: "req" := list_of_term "req" in
