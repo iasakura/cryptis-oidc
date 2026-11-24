@@ -20,8 +20,8 @@ game is a HeapLang program that runs the honest parties next to the attacker and
 
     security  =  no thread of [run_network game] ever gets stuck
 
-(see [oidc_secure] at the end).  This file only *states* the goal; nothing here
-is proved yet.
+(see [oidc_secure] at the end).  This file only *states* the goal; it is proved
+in [proofs/security.v] ([oidc_is_secure]).
 
 ** Parties
 
@@ -55,37 +55,44 @@ is proved yet.
 ** What this game can and cannot tell apart
 
 The README asks that removing any single defence should make the proof fail.
-Going through the defences against this game by hand (pen and paper, not
-machine-checked — treat it as a hypothesis until the proof exists) says that
-this is only true for some of them:
+For this game that is only true for some of them, and the proof in [proofs/]
+says which.
 
-  Needed on their own.  Dropping any one of these gives an attack on W1:
+  Used by the proof.  By a pen-and-paper argument each of these is needed on its
+  own: dropping one gives an attack on W1.
     - the password check at the OP;
     - TLS: confidentiality of requests and responses, and the binding of a
       response to its request;
     - the origin-scoped cookie jar (the RP cookie would go to attacker hosts);
     - the RP looking its session up by the browser's cookie;
-    - exact matching of the registered redirect URI (the OP would hand the
-      honest user's code to an attacker host);
+    - the OP sending the code to the redirect URI *registered* for the client
+      (otherwise it would hand the honest user's code to an attacker host);
     - the code being bound to the client it was issued to (the attacker has
       the user authorize the *attacker's* client, with the nonce and PKCE
       challenge of the attacker's own session at the RP, and then has the RP
       redeem that code).
 
-  Not needed here, as far as I can tell.  With the defences above in place the
-  authorization code never reaches the attacker, and the following only matter
-  once it does, or once two flows overlap in one browser:
-    - the [state] comparison, the [nonce] comparison and PKCE all guard against
-      a code turning up in the wrong session, and each of them covers for the
-      other two;
-    - [client_secret] and single-use codes limit what a leaked code is worth;
-    - the id_token signature and the [iss]/[aud] claims repeat what the TLS
-      connection to the token endpoint already guarantees in the code flow;
-    - the [iss] comparison in the callback (RFC 9207): in [impl.v] the RP picks
-      the token endpoint from the callback's own [iss], so without the
-      comparison it would still talk to the right provider.
+  Not used.  The proof treats [state], [nonce], the PKCE verifier and the
+  client secret as public from the start, and never uses what the following
+  checks establish:
+    - the [state] comparison, the [nonce] comparison and PKCE, which all guard
+      against a code turning up in the wrong session;
+    - [client_secret] and single-use codes, which limit what a leaked code is
+      worth;
+    - the [iss]/[aud] claims of the id_token.  Its signature is verified, but
+      the proof learns who logged in from the TLS connection to the token
+      endpoint and never opens the signing predicate;
+    - the [iss] comparison in the callback (RFC 9207): the RP picks the token
+      endpoint from the callback's own [iss], so without the comparison it
+      would still talk to the right provider;
+    - the comparison of the [redirect_uri] parameter with the registered one:
+      [OP.handle_authorize] redirects to the registered URI whatever the request
+      says, so the comparison decides nothing.
+  With the defences above in place the authorization code never reaches the
+  attacker, and these only matter once it does, or once two flows overlap in
+  one browser.
 
-So a proof of this game would not, by itself, show that those defences do
+So the proof of this game does not, by itself, show that those defences do
 anything.  Making them matter needs a stronger attacker, for instance:
   - leaking the authorization response of flows the user started (Referer,
     history, logs), which is what PKCE, [nonce] and [client_secret] are for.
@@ -95,7 +102,9 @@ anything.  Making them matter needs a stronger attacker, for instance:
     (needs servers that answer failed requests instead of staying silent, so
     that a navigation always ends), which is what [state] is for;
   - an RP variant that picks the token endpoint from its session rather than
-    from the callback, which is what RFC 9207 is for.
+    from the callback, which is what RFC 9207 is for;
+  - an OP variant that redirects to the [redirect_uri] of the request, which is
+    what the comparison with the registered one is for.
 
 ** Simplifications
 

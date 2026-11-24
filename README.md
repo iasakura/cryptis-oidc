@@ -4,8 +4,10 @@ A symbolic (Dolev–Yao) model of **OpenID Connect**, authorization code flow wi
 PKCE, built on [Cryptis](https://github.com/arthuraa/cryptis) — a separation
 logic for cryptographic protocols on top of Iris and HeapLang.
 
-Status: **skeleton**. `oidc/impl.v` defines the executable HeapLang layer
-(browser, relying party, provider) and compiles. No proofs yet.
+Status: the model (`oidc/impl.v`), a security game (`oidc/game.v`) and a
+machine-checked proof that the game is won (`oidc/proofs/`, theorem
+`oidc_is_secure`). The game is a modest one: it leaves several of the defences
+below without anything to do. See [What is proved](#what-is-proved).
 
 ## Why this is not just a crypto proof
 
@@ -29,7 +31,7 @@ OP →  B : 303 → rp_host /cb ⟨code, state, iss⟩
 B  →  RP: /cb ⟨code, state, iss⟩, Cookie: sid
 RP →  OP: /token ⟨client_id, secret, code, verifier⟩     (direct, not via B)
 OP →  RP: ⟨id_token⟩
-RP →  B : page ⟨sub⟩
+RP →  B : page ⟨iss, sub⟩
 
 id_token = sign skOP ⟨iss, sub, aud, nonce⟩
 ```
@@ -51,7 +53,8 @@ id_token = sign skOP ⟨iss, sub, aud, nonce⟩
 
 ## Defences modelled explicitly
 
-Each one is what rules out a specific known attack.
+Each one is what rules out a specific known attack. The current game does not
+exercise all of them; see [What is proved](#what-is-proved).
 
 | Defence | Attack it blocks |
 | --- | --- |
@@ -78,19 +81,42 @@ The `TLS` module is an abstract server-authenticated confidential channel
 secrecy, no replay protection, no client authentication. Replace it once
 `cryptis`'s own `examples/tls13` closes.
 
-## Next step
+## What is proved
 
-The proofs. The centre of gravity is the provider's signing predicate:
+`oidc/game.v` runs an honest provider, an honest relying party and an honest
+user next to the attacker, who controls the network, owns every other host, has
+an account and a client at the honest provider, is a provider the relying party
+trusts, and can send the user's browser anywhere. Two properties are asserted
+in the code of the game:
 
-```coq
-sign_pred (oidcN.@"id_token") (λ skOP m,
-  ∃ sub aud nonce, ⌜m = Spec.of_list [Spec.pkey skOP; sub; aud; nonce]⌝ ∗
-    authorized skOP sub aud nonce)
-```
+- **W1, authentication.** The attacker never holds a relying-party session that
+  is logged in as the honest user.
+- **W2, session integrity.** When the honest user logs in through the honest
+  provider, the page they get is their own.
 
-Before proving anything, write the game and check that removing any single
-defence above makes the proof *fail* — otherwise a closed proof may only mean
-the model is too weak to express the attack.
+`oidc_is_secure` in `oidc/proofs/security.v` says that no thread of the game
+ever gets stuck, and a failed assertion is a stuck thread.
+
+| File | Contents |
+| --- | --- |
+| `proofs/base.v` | the predicates on messages, and what is secret |
+| `proofs/tls.v` | the TLS layer: a response is bound to its request |
+| `proofs/op.v` | the provider and its invariant |
+| `proofs/rp.v` | the relying party and its invariant, which is W1 |
+| `proofs/browser.v` | the browser: where cookies and parameters may go |
+| `proofs/security.v` | the user (W2), the game, the theorem |
+
+### What the proof does not show
+
+The proof uses only some of the defences in the table above: the password, TLS,
+the cookie jar, the relying party's session lookup, the provider sending the
+code to the registered redirect URI, and the code being bound to its client. It
+treats `state`, `nonce`, the PKCE verifier and the client secret as public
+values and never relies on the checks made with them, nor on the issuer check
+of RFC 9207. The header of `oidc/game.v` has the list, and the attacker
+capabilities that would give those defences something to do: leaking the
+authorization response, letting two flows overlap in one browser, and a relying
+party that picks the token endpoint from its session.
 
 ## Building
 

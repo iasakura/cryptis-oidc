@@ -12,8 +12,9 @@ Unset Printing Implicit Defensive.
 
 (*
 
-OpenID Connect, authorization code flow with PKCE.  Skeleton only: this file
-defines the executable HeapLang layer, no proofs yet.
+OpenID Connect, authorization code flow with PKCE.  This file defines the
+executable HeapLang layer; the security game is in [game.v] and its proof in
+[proofs/].
 
 Parties: an end user driving a Browser, a Relying Party (RP, the OIDC client)
 and an OpenID Provider (OP).  Every RP/OP endpoint is reached over an abstract
